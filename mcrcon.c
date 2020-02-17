@@ -45,6 +45,8 @@
     #include <netinet/in.h>
     #include <arpa/inet.h>
     #include <netdb.h>
+    #include <readline/readline.h>
+    #include <readline/history.h>
 #endif
 
 #define VERSION "0.7.1"
@@ -653,7 +655,6 @@ int run_terminal_mode(int sock)
 	puts("Logged in. Type 'quit' or 'exit' to quit.");
 
 	while (global_connection_alive) {
-		putchar('>');
 		int len = get_line(command, DATA_BUFFSIZE);
 
 		if ((strcasecmp(command, "exit") && strcasecmp(command, "quit")) == 0)
@@ -685,6 +686,32 @@ int run_terminal_mode(int sock)
 // gets line from stdin and deals with rubbish left in the input buffer
 int get_line(char *buffer, int bsize)
 {
+#ifndef _WIN32
+	static char *line_read = NULL;
+    int len;
+
+	if (line_read == NULL) {
+		rl_bind_key('\t', rl_insert);
+	} else {
+		free(line_read);
+	}
+
+	if ((line_read = readline("> ")) == NULL) {
+		global_connection_alive = 0;
+		return 0;
+	}
+
+	buffer[strcspn(line_read, "\r\n")] = '\0';
+
+	if ((len = strlen(line_read)) > 0) {
+		add_history(line_read);
+	}
+
+	strncpy(buffer, line_read, len < bsize ? len : bsize);
+
+	return len;
+#else
+    putchar('>');
 	char *ret = fgets(buffer, bsize, stdin);
 	if (ret == NULL)
 		exit(EXIT_FAILURE);
@@ -704,4 +731,5 @@ int get_line(char *buffer, int bsize)
 	}
 
 	return len;
+#endif
 }
